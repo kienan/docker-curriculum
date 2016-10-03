@@ -1,28 +1,54 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for
+from werkzeug import secure_filename
+import os
+import subprocess
 import random
 
 app = Flask(__name__)
 
-# list of cat images
-images = [
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr05/15/9/anigif_enhanced-buzz-26388-1381844103-11.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr01/15/9/anigif_enhanced-buzz-31540-1381844535-8.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr05/15/9/anigif_enhanced-buzz-26390-1381844163-18.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr06/15/10/anigif_enhanced-buzz-1376-1381846217-0.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr03/15/9/anigif_enhanced-buzz-3391-1381844336-26.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr06/15/10/anigif_enhanced-buzz-29111-1381845968-0.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr03/15/9/anigif_enhanced-buzz-3409-1381844582-13.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr02/15/9/anigif_enhanced-buzz-19667-1381844937-10.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr05/15/9/anigif_enhanced-buzz-26358-1381845043-13.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr06/15/9/anigif_enhanced-buzz-18774-1381844645-6.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr06/15/9/anigif_enhanced-buzz-25158-1381844793-0.gif",
-    "http://ak-hdl.buzzfed.com/static/2013-10/enhanced/webdr03/15/10/anigif_enhanced-buzz-11980-1381846269-1.gif"
-]
+# This is the path to the upload directory
+app.config['UPLOAD_FOLDER'] = 'uploads/'
+# These are the extension that we are accepting to be uploaded
+app.config['ALLOWED_EXTENSIONS'] = set(['cc'])
 
 @app.route('/')
 def index():
-    url = random.choice(images)
-    return render_template('index.html', url=url)
+    return render_template('index.html')
+
+# Route that will process the file upload
+@app.route('/upload', methods=['POST'])
+def upload():
+    # Get the name of the uploaded file
+    file = request.files['file']
+    # Check if the file is one of the allowed types/extensions
+    if file:
+        # Make the filename safe, remove unsupported chars
+        filename = secure_filename(file.filename)
+        # Move the file form the temporal folder to
+        # the upload folder we setup
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        # Redirect the user to the uploaded_file route, which
+        # will basicaly show on the browser the uploaded file
+        return redirect(url_for('uploaded_file',
+                                filename=filename))
+
+# This route is expecting a parameter containing the name
+# of a file. Then it will locate that file on the upload
+# directory and show it on the browser, so if the user uploads
+# an image, that image is going to be show after the upload
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+
+    subprocess.call("rm -f ./a.out", shell=True)
+    retcode = subprocess.call("/usr/bin/g++ uploads/" + filename, shell=True)
+    
+    if retcode:
+        return render_template('results.html', message='failed to compile walk.cc')
+    
+    subprocess.call("rm -f ./output", shell=True)
+    retcode = subprocess.call("./test.sh", shell=True)
+    
+    return render_template('results.html', message="Score: " + str(retcode) + " out of 2 correct.")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0")
